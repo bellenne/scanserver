@@ -53,7 +53,7 @@ def show_defect_window(
     numbers_entry.focus_set()
 
     # comment
-    ttk.Label(frm, text="Комментарий (необязательно):", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+    ttk.Label(frm, text="Комментарий:", font=("Segoe UI", 9, "bold")).pack(anchor="w")
     comment_var = tk.StringVar(value="")
     comment_entry = ttk.Entry(frm, textvariable=comment_var)
     comment_entry.pack(fill="x", pady=(4, 10))
@@ -62,13 +62,30 @@ def show_defect_window(
     btns = ttk.Frame(frm)
     btns.pack(fill="x", pady=(10, 0))
 
-    def _validate_numbers() -> bool:
-        return bool(numbers_var.get().strip())
+    error_var = tk.StringVar(value="")
+    error_label = ttk.Label(frm, textvariable=error_var, foreground="red")
+    error_label.pack(anchor="w", pady=(4, 0))
+
+    def _validate() -> bool:
+        numbers = numbers_var.get().strip()
+        comment = comment_var.get().strip()
+
+        if not numbers:
+            error_var.set("Заполните номера полотен или количество.")
+            return False
+
+        if not comment:
+            error_var.set("Комментарий обязателен для заполнения.")
+            return False
+
+        error_var.set("")
+        return True
 
     def on_send() -> None:
         nonlocal result
-        if not _validate_numbers():
+        if not _validate():
             return
+
         result = {
             "submit": "send",
             "product_type": prod_var.get().strip(),

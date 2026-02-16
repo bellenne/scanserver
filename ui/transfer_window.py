@@ -74,6 +74,9 @@ def show_transfer_window(
     btns = ttk.Frame(frm)
     btns.pack(fill="x", pady=(10, 0))
 
+    error_var = tk.StringVar(value="")
+    ttk.Label(frm, textvariable=error_var, foreground="red").pack(anchor="w", pady=(6, 0))
+
     def build_done_map() -> dict[str, int] | None:
         out: dict[str, int] = {}
         for size, v in vars_map.items():
@@ -90,11 +93,25 @@ def show_transfer_window(
                 out[size] = n
         return out if out else None
 
+    def _validate(dm: dict[str, int] | None) -> bool:
+        if dm is None:
+            error_var.set("Заполните хотя бы один размер (число).")
+            return False
+
+        if with_comment:
+            if comment_var is None or not comment_var.get().strip():
+                error_var.set("Комментарий обязателен для заполнения.")
+                return False
+
+        error_var.set("")
+        return True
+
     def on_send() -> None:
         nonlocal result
         dm = build_done_map()
-        if dm is None:
+        if not _validate(dm):
             return
+
         result = {
             "done_map": dm,
             "comment": comment_var.get().strip() if comment_var else "",

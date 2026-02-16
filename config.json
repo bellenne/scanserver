@@ -1,6 +1,6 @@
 {
   "env": "dev",
-  "base_url": "http://localhost:8000",
+  "base_url": "https://customcraft-mes.ru",
   "http_timeout_s": 8,
 
   "state_file": "state.json",
@@ -11,8 +11,7 @@
   "tts_edge_voice": "ru-RU-DmitryNeural",
 
   "scanners": [
-    { "device_id": "BG01", "com_port": "COM3", "baudrate": 9600},
-    { "device_id": "SM01", "com_port": "COM4", "baudrate": 9600}
+    { "device_id": "BG01", "com_port": "COM3", "baudrate": 9600}
   ],
 
   "endpoints": {
