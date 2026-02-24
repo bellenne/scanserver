@@ -17,6 +17,7 @@
   "endpoints": {
     "events": "/api/v1/cut/scan",
     "transfer": "/api/v1/transfer/scan",
-    "defect": "/api/v1/cut/scan"
+    "defect": "/api/v1/cut/scan",
+    "package": "/api/v1/package/scan"
   }
 }

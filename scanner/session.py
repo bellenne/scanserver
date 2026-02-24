@@ -16,6 +16,7 @@ from modes.compare_fill import CompareFillMode
 from modes.defect import DefectMode
 from modes.transfer import TransferMode
 from modes.transfer_defect import TransferDefectMode
+from modes.package import PackageMode
 from modes.base import Mode
 from core.config import Endpoints
 import httpx
@@ -81,6 +82,7 @@ class ScannerSession:
             "DEFECT": DefectMode(),
             "TRANSFER": TransferMode(),
             "TRANSFER_DEFECT": TransferDefectMode(),
+            "PACKAGE": PackageMode(),
         }
 
         self._reader = ComReader(
@@ -92,7 +94,7 @@ class ScannerSession:
         self._thread = threading.Thread(target=self._reader.run_forever, name=f"com-{device_id}", daemon=True)
 
         self._last_activity_ts: float | None = None
-        self._idle_timeout_s = 1 * 60
+        self._idle_timeout_s = 15 * 60
         self._idle_thread: threading.Thread | None = None
 
     def touch_activity(self) -> None:
@@ -233,7 +235,7 @@ class ScannerSession:
         user_name = None
         mode = d.get("mode", "COMPARE_FILL")
 
-        if mode not in ("COMPARE_FILL", "DEFECT", "TRANSFER","TRANSFER_DEFECT"):
+        if mode not in ("COMPARE_FILL", "DEFECT", "TRANSFER","TRANSFER_DEFECT", "PACKAGE"):
             mode = "COMPARE_FILL"
 
         try:
@@ -262,4 +264,5 @@ class ScannerSession:
         self.tts.say("Пользователь снят")
         log.info("[%s] user cleared (%s)", self.device_id, reason)
 
-    
+    def get_mode_name(self) -> str:
+        return str(self._state.mode)

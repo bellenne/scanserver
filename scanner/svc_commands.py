@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-ModeName = Literal["COMPARE_FILL", "DEFECT", "TRANSFER", "TRANSFER_DEFECT"]
+ModeName = Literal["COMPARE_FILL", "DEFECT", "TRANSFER", "TRANSFER_DEFECT", "PACKAGE"]
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,7 @@ def parse_svc(line: str) -> SvcCommand | None:
 
     if kind == "MODE":
         m = parts[2].strip().upper()
-        if m in ("COMPARE_FILL", "DEFECT", "TRANSFER", "TRANSFER_DEFECT"):
+        if m in ("COMPARE_FILL", "DEFECT", "TRANSFER", "TRANSFER_DEFECT", "PACKAGE"):
             return SvcMode(mode=m)  # type: ignore[arg-type]
         return None
 
