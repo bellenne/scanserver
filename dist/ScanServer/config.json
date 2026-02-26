@@ -1,0 +1,23 @@
+{
+  "env": "dev",
+  "base_url": "https://customcraft-mes.ru",
+  "http_timeout_s": 8,
+
+  "state_file": "state.json",
+  "users_cache_file": "users_cache.json",
+  "users_cache_ttl_s": 300,
+
+  "tts_prefer_edge": true,
+  "tts_edge_voice": "ru-RU-DmitryNeural",
+
+  "scanners": [
+    { "device_id": "BG01", "com_port": "COM3", "baudrate": 9600}
+  ],
+
+  "endpoints": {
+    "events": "/api/v1/cut/scan",
+    "transfer": "/api/v1/transfer/scan",
+    "defect": "/api/v1/cut/scan",
+    "package": "/api/v1/package/scan"
+  }
+}

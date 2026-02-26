@@ -19,6 +19,7 @@ class Endpoints:
     events: str = "/api/v1/cut/scan"
     transfer: str = "/api/v1/transfer/scan"
     defect: str = "/api/v1/defects/"
+    package: str = "/api/v1/package/scan"
 
 
 @dataclass(frozen=True)

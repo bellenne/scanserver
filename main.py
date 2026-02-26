@@ -12,18 +12,27 @@ from api.client import ApiClient
 from api.users_cache import UsersCache
 from scanner.manager import ScannerManager
 
+def app_dir() -> Path:
+    # если exe
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    # если обычный python запуск
+    return Path.cwd()
+
+def p_near_exe(name: str) -> Path:
+    return app_dir() / name
 
 def main() -> int:
     setup_logging()
 
-    cfg = load_config(Path("config.json"))
-    state = StateStore(Path(cfg.state_file))
+    cfg = load_config(p_near_exe("config.json"))
+    state = StateStore(p_near_exe(Path(cfg.state_file).name))
     state_data = state.load()
 
     api = ApiClient(base_url=cfg.base_url, timeout_s=cfg.http_timeout_s)
     users_cache = UsersCache(
         api=api,
-        cache_file=Path(cfg.users_cache_file),
+        cache_file=p_near_exe(Path(cfg.users_cache_file).name),
         ttl_s=cfg.users_cache_ttl_s,
     )
 

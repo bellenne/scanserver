@@ -201,7 +201,7 @@ class ScannerSession:
     def set_mode(self, mode: ModeName, reason: str = "manual") -> None:
         self._state.mode = mode
         self._persist_state()
-        modes = {"COMPARE_FILL":"рЕзка", "DEFECT":"Брак рЕзки", "TRANSFER":"Перенос", "TRANSFER_DEFECT":"Брак переноса"}
+        modes = {"COMPARE_FILL":"рЕзка", "DEFECT":"Брак рЕзки", "TRANSFER":"Перенос", "TRANSFER_DEFECT":"Брак переноса", "PACKAGE":"Упаковка"}
         self.tts.say(f"Режим {modes[mode]}")
         log.info("[%s] mode set to %s (%s)", self.device_id, mode, reason)
 

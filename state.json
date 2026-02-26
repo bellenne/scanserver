@@ -1,10 +1,10 @@
 {
   "devices": {
     "BG01": {
-      "user_id": null,
-      "user_name": null,
-      "mode": "TRANSFER_DEFECT",
-      "com_port": "COM3"
+      "user_id": 1,
+      "user_name": "Admin Root",
+      "mode": "PACKAGE",
+      "com_port": "COM4"
     }
   }
 }
