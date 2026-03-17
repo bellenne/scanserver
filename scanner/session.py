@@ -91,6 +91,7 @@ class ScannerSession:
             port=self.com_port,
             baudrate=self.baudrate,
             on_line=self.on_line,
+            on_connected=self.on_connected,
         )
 
         self._thread = threading.Thread(target=self._reader.run_forever, name=f"com-{device_id}", daemon=True)
@@ -125,13 +126,6 @@ class ScannerSession:
     def start(self) -> None:
         log.info("[%s] start session on %s", self.device_id, self.com_port)
         self._thread.start()
-        if self._state.user_id is None:
-            self.tts.say(f"Сканер {self.device_id} запущен. Ожидаю пользователя.")
-        else:
-            if self._state.user_name:
-                self.tts.say(f"Сканер {self.device_id} запущен. Пользователь: {self._state.user_name}.")
-            else:
-                self.tts.say(f"Сканер {self.device_id} запущен. Пользователь {self._state.user_id}.")
         self._idle_thread = threading.Thread(target=self._idle_watchdog, daemon=True, name=f"idle-{self.device_id}")
         self._idle_thread.start()
 
@@ -145,6 +139,18 @@ class ScannerSession:
     def on_line(self, line: str) -> None:
         log.info("[%s] <- %s", self.device_id, line)
         self._router.route(self, line)
+
+    def on_connected(self) -> None:
+        log.info("[%s] COM connected on %s", self.device_id, self.com_port)
+        if self._state.user_id is None:
+            self.tts.say("Сканер {} запущен. Ожидаю пользователя.".format(self.device_id))
+            return
+
+        if self._state.user_name:
+            self.tts.say("Сканер {} запущен. Пользователь: {}.".format(self.device_id, self._state.user_name))
+        else:
+            self.tts.say("Сканер {} запущен. Пользователь {}.".format(self.device_id, self._state.user_id))
+
 
     def get_user_name(self) -> str | None:
         return self._state.user_name

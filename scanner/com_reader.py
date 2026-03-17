@@ -15,11 +15,13 @@ class ComReader:
         port: str,
         baudrate: int,
         on_line: Callable[[str], None],
+        on_connected: Callable[[], None] | None = None,
         reconnect_delay_s: float = 1.5,
     ) -> None:
         self.port = port
         self.baudrate = baudrate
         self.on_line = on_line
+        self.on_connected = on_connected
         self.reconnect_delay_s = reconnect_delay_s
         self._stop = False
         self._ser: Optional[serial.Serial] = None
@@ -53,6 +55,8 @@ class ComReader:
     def _connect(self) -> None:
         log.info("Connecting %s @ %s", self.port, self.baudrate)
         self._ser = serial.Serial(self.port, self.baudrate, timeout=1)
+        if self.on_connected is not None:
+            self.on_connected()
 
     def _read_loop(self) -> None:
         assert self._ser is not None

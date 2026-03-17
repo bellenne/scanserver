@@ -28,7 +28,7 @@
   "scanners": [
     {
       "device_id": "BG01",
-      "com_port": "COM4",
+      "com_port": "COM3",
       "baudrate": 9600
     }
   ],
