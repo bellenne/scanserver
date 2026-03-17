@@ -3,8 +3,8 @@
     "BG01": {
       "user_id": 1,
       "user_name": "Admin Root",
-      "mode": "PACKAGE",
-      "com_port": "COM4"
+      "mode": "DEFECT",
+      "com_port": "COM3"
     }
   }
 }

@@ -12,6 +12,7 @@ from scanner.com_reader import ComReader
 from scanner.router import Router
 from scanner.svc_commands import ModeName
 from tts.manager import TTSManager
+from modes.compare import CompareMode
 from modes.compare_fill import CompareFillMode
 from modes.defect import DefectMode
 from modes.transfer import TransferMode
@@ -79,6 +80,7 @@ class ScannerSession:
 
         self._modes: dict[ModeName, Mode] = {
             "COMPARE_FILL": CompareFillMode(),
+            "COMPARE": CompareMode(),
             "DEFECT": DefectMode(),
             "TRANSFER": TransferMode(),
             "TRANSFER_DEFECT": TransferDefectMode(),
@@ -201,7 +203,7 @@ class ScannerSession:
     def set_mode(self, mode: ModeName, reason: str = "manual") -> None:
         self._state.mode = mode
         self._persist_state()
-        modes = {"COMPARE_FILL":"рЕзка", "DEFECT":"Брак рЕзки", "TRANSFER":"Перенос", "TRANSFER_DEFECT":"Брак переноса", "PACKAGE":"Упаковка"}
+        modes = {"COMPARE_FILL":"Резка (заполнение)", "COMPARE":"Сравнение", "DEFECT":"Брак резки", "TRANSFER":"Перенос", "TRANSFER_DEFECT":"Брак переноса", "PACKAGE":"Упаковка"}
         self.tts.say(f"Режим {modes[mode]}")
         log.info("[%s] mode set to %s (%s)", self.device_id, mode, reason)
 
@@ -235,7 +237,7 @@ class ScannerSession:
         user_name = None
         mode = d.get("mode", "COMPARE_FILL")
 
-        if mode not in ("COMPARE_FILL", "DEFECT", "TRANSFER","TRANSFER_DEFECT", "PACKAGE"):
+        if mode not in ("COMPARE_FILL", "COMPARE", "DEFECT", "TRANSFER","TRANSFER_DEFECT", "PACKAGE"):
             mode = "COMPARE_FILL"
 
         try:
