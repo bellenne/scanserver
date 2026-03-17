@@ -4,28 +4,35 @@ import signal
 import sys
 from pathlib import Path
 
+from api.client import ApiClient
+from api.users_cache import UsersCache
 from core.config import load_config
 from core.logging_setup import setup_logging
 from core.state_store import StateStore
-from tts.manager import TTSManager
-from api.client import ApiClient
-from api.users_cache import UsersCache
+from core.updater import try_update_from_github
 from scanner.manager import ScannerManager
+from tts.manager import TTSManager
+
 
 def app_dir() -> Path:
-    # если exe
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    # если обычный python запуск
     return Path.cwd()
+
 
 def p_near_exe(name: str) -> Path:
     return app_dir() / name
+
 
 def main() -> int:
     setup_logging()
 
     cfg = load_config(p_near_exe("config.json"))
+
+    if try_update_from_github(cfg.updater, app_dir()):
+        print("Update scheduled. Restarting application...")
+        return 0
+
     state = StateStore(p_near_exe(Path(cfg.state_file).name))
     state_data = state.load()
 
