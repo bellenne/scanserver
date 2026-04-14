@@ -1,4 +1,4 @@
 from __future__ import annotations
 
 APP_NAME = "ScanServer"
-APP_VERSION = "1.1.3"
+APP_VERSION = "1.1.4"
