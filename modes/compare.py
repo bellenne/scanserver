@@ -9,6 +9,11 @@ from modes.compare_fill import _extract_key_from_payload
 
 log = logging.getLogger("mode.compare")
 
+try:
+    import winsound
+except ImportError:  # pragma: no cover - winsound exists only on Windows
+    winsound = None
+
 
 @dataclass
 class PendingCompare3:
@@ -17,6 +22,15 @@ class PendingCompare3:
     second_payload: str | None = None
     second_key: str | None = None
     ts: float = 0.0
+
+
+def _play_feedback_sound(session: "ScannerSession", ok: bool) -> None:
+    if winsound is None:
+        session.tts.say("Всё верно." if ok else "Не верно.")
+        return
+
+    sound_alias = "SystemAsterisk" if ok else "SystemHand"
+    winsound.PlaySound(sound_alias, winsound.SND_ALIAS | winsound.SND_ASYNC)
 
 
 class CompareMode(ModeBase):
@@ -43,14 +57,14 @@ class CompareMode(ModeBase):
                 first_key=current_key,
                 ts=now,
             )
-            session.tts.say("Первый принят. Жду второй.")
+            # session.tts.say("Первый принят. Жду второй.")
             log.info("[%s] COMPARE step1 key=%s payload=%s", dev, current_key, payload)
             return
 
         if pending.second_payload is None:
             if pending.first_key != current_key:
                 self._pending.pop(dev, None)
-                session.tts.say("Не верно.")
+                _play_feedback_sound(session, ok=False)
                 log.info(
                     "[%s] COMPARE step2 fail: first_key=%s second_key=%s first_payload=%s second_payload=%s",
                     dev,
@@ -64,14 +78,14 @@ class CompareMode(ModeBase):
             pending.second_payload = payload
             pending.second_key = current_key
             pending.ts = now
-            session.tts.say("Второй принят. Жду третий.")
+            # session.tts.say("Второй принят. Жду третий.")
             log.info("[%s] COMPARE step2 ok: key=%s payload=%s", dev, current_key, payload)
             return
 
         self._pending.pop(dev, None)
 
         if pending.first_key == current_key:
-            session.tts.say("Всё верно.")
+            _play_feedback_sound(session, ok=True)
             log.info(
                 "[%s] COMPARE success: key=%s first_payload=%s second_payload=%s third_payload=%s",
                 dev,
@@ -82,7 +96,7 @@ class CompareMode(ModeBase):
             )
             return
 
-        session.tts.say("Не верно.")
+        _play_feedback_sound(session, ok=False)
         log.info(
             "[%s] COMPARE step3 fail: first_key=%s third_key=%s first_payload=%s second_payload=%s third_payload=%s",
             dev,
