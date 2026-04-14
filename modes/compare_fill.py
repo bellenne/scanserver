@@ -36,6 +36,8 @@ def _extract_key_from_payload(payload: str) -> str:
     Попытаться вытащить "ключ сравнения" из payload.
     Правила:
       - Если внутри payload есть сегменты через '|' и среди них есть 'art=VALUE' -> вернуть VALUE
+      - Иначе если последний сегмент похож на артикул -> вернуть его
+      - Иначе если первый сегмент похож на артикул -> вернуть его
       - Иначе если payload содержит '|' -> вернуть часть до первого '|'
       - Иначе вернуть весь payload
     """
@@ -43,17 +45,33 @@ def _extract_key_from_payload(payload: str) -> str:
         return ""
 
     p = str(payload)
-    parts = p.split("|")
+    parts = [part.strip() for part in p.split("|")]
 
     for part in parts:
-        part_stripped = part.strip()
-        if "=" in part_stripped:
-            k, _, v = part_stripped.partition("=")
+        if "=" in part:
+            k, _, v = part.partition("=")
             if k.strip().lower() == "art":
                 return _normalize_key(v)
 
-    if len(parts) >= 1 and parts[0].strip() != "":
-        return _normalize_key(parts[0].strip())
+    def looks_like_article(part: str) -> bool:
+        candidate = part.strip()
+        if not candidate or "=" in candidate:
+            return False
+        has_alpha = any(ch.isalpha() for ch in candidate)
+        has_sep = any(ch in candidate for ch in ("-", "_", "x", "X", "х", "Х"))
+        return has_alpha and has_sep
+
+    if parts:
+        tail = parts[-1]
+        if looks_like_article(tail):
+            return _normalize_key(tail)
+
+        head = parts[0]
+        if looks_like_article(head):
+            return _normalize_key(head)
+
+    if len(parts) >= 1 and parts[0] != "":
+        return _normalize_key(parts[0])
 
     return _normalize_key(p)
 

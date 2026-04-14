@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass
 
@@ -29,8 +30,20 @@ def _play_feedback_sound(session: "ScannerSession", ok: bool) -> None:
         session.tts.say("Всё верно." if ok else "Не верно.")
         return
 
-    sound_alias = "SystemAsterisk" if ok else "SystemHand"
-    winsound.PlaySound(sound_alias, winsound.SND_ALIAS | winsound.SND_ASYNC)
+    pattern = (
+        ((1760, 90), (2093, 110), (2637, 170))
+        if ok
+        else ((220, 160), (165, 180), (110, 260), (147, 200))
+    )
+
+    def run_pattern() -> None:
+        for freq, duration in pattern:
+            try:
+                winsound.Beep(freq, duration)
+            except RuntimeError:
+                break
+
+    threading.Thread(target=run_pattern, name="compare-feedback-sound", daemon=True).start()
 
 
 class CompareMode(ModeBase):
