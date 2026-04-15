@@ -59,6 +59,9 @@ class ScannerManager:
         for s in self._sessions:
             s.stop()
 
+        for s in self._sessions:
+            s.join(timeout=2.0)
+
         try:
             self.api.close()
         except Exception:

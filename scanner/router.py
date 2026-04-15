@@ -27,4 +27,3 @@ class Router:
         # обычный payload -> текущий режим
         mode: Mode = session.get_mode_handler()
         mode.on_scan(session=session, payload=line)
-        session.touch_activity()

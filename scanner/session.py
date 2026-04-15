@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+import queue
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from api.client import ApiClient
 from api.users_cache import UsersCache
@@ -25,6 +26,10 @@ import time
 
 log = logging.getLogger("scanner.session")
 
+_SCAN_QUEUE_SIZE = 256
+_QUEUE_WARN_THRESHOLD = 8
+
+
 class SessionSpeaker:
     def __init__(self, base_tts, session: "ScannerSession") -> None:
         self._tts = base_tts
@@ -46,6 +51,13 @@ class ScannerSessionState:
     user_id: int | None
     user_name: str | None
     mode: ModeName
+
+
+@dataclass(slots=True)
+class ScanTask:
+    seq: int
+    line: str
+    received_ts: float = field(default_factory=time.time)
 
 
 class ScannerSession:
@@ -75,6 +87,8 @@ class ScannerSession:
 
         self._router = Router()
         self._stop = threading.Event()
+        self._scan_seq = 0
+        self._scan_q: "queue.Queue[ScanTask | None]" = queue.Queue(maxsize=_SCAN_QUEUE_SIZE)
 
         self._state = self._load_state()
 
@@ -95,6 +109,7 @@ class ScannerSession:
         )
 
         self._thread = threading.Thread(target=self._reader.run_forever, name=f"com-{device_id}", daemon=True)
+        self._worker_thread = threading.Thread(target=self._scan_worker, name=f"scan-{device_id}", daemon=True)
 
         self._last_activity_ts: float | None = None
         self._idle_timeout_s = 15 * 60
@@ -125,6 +140,7 @@ class ScannerSession:
 
     def start(self) -> None:
         log.info("[%s] start session on %s", self.device_id, self.com_port)
+        self._worker_thread.start()
         self._thread.start()
         self._idle_thread = threading.Thread(target=self._idle_watchdog, daemon=True, name=f"idle-{self.device_id}")
         self._idle_thread.start()
@@ -132,13 +148,54 @@ class ScannerSession:
     def stop(self) -> None:
         self._stop.set()
         self._reader.stop()
+        try:
+            self._scan_q.put_nowait(None)
+        except queue.Full:
+            try:
+                self._scan_q.get_nowait()
+            except queue.Empty:
+                pass
+            try:
+                self._scan_q.put_nowait(None)
+            except queue.Full:
+                pass
 
     def join(self, timeout: float | None = None) -> None:
         self._thread.join(timeout=timeout)
+        self._worker_thread.join(timeout=timeout)
+        if self._idle_thread is not None:
+            self._idle_thread.join(timeout=timeout)
 
     def on_line(self, line: str) -> None:
-        log.info("[%s] <- %s", self.device_id, line)
-        self._router.route(self, line)
+        self._scan_seq += 1
+        task = ScanTask(seq=self._scan_seq, line=line)
+        queued_before = self._scan_q.qsize()
+        try:
+            self._scan_q.put_nowait(task)
+        except queue.Full:
+            log.error(
+                "[%s] scan queue overflow: dropping seq=%s line=%s",
+                self.device_id,
+                task.seq,
+                line,
+            )
+            self.tts.say("Сканер перегружен")
+            return
+
+        log.info(
+            "[%s] <- queued seq=%s size=%s line=%s",
+            self.device_id,
+            task.seq,
+            self._scan_q.qsize(),
+            line,
+        )
+        if queued_before >= _QUEUE_WARN_THRESHOLD:
+            log.warning(
+                "[%s] scan queue backlog size=%s after seq=%s",
+                self.device_id,
+                self._scan_q.qsize(),
+                task.seq,
+            )
 
     def on_connected(self) -> None:
         log.info("[%s] COM connected on %s", self.device_id, self.com_port)
@@ -274,3 +331,43 @@ class ScannerSession:
 
     def get_mode_name(self) -> str:
         return str(self._state.mode)
+
+    def _scan_worker(self) -> None:
+        while True:
+            try:
+                task = self._scan_q.get(timeout=0.5)
+            except queue.Empty:
+                if self._stop.is_set():
+                    break
+                continue
+
+            if task is None:
+                self._scan_q.task_done()
+                break
+
+            started_ts = time.time()
+            queue_wait_ms = int((started_ts - task.received_ts) * 1000)
+            log.info(
+                "[%s] -> processing seq=%s queue_wait_ms=%s line=%s",
+                self.device_id,
+                task.seq,
+                queue_wait_ms,
+                task.line,
+            )
+            try:
+                self._router.route(self, task.line)
+            except Exception as e:
+                log.exception("[%s] scan processing failed for seq=%s: %s", self.device_id, task.seq, e)
+                self.tts.say("Ошибка обработки")
+            else:
+                self.touch_activity()
+            finally:
+                processing_ms = int((time.time() - started_ts) * 1000)
+                log.info(
+                    "[%s] <- processed seq=%s processing_ms=%s remaining=%s",
+                    self.device_id,
+                    task.seq,
+                    processing_ms,
+                    self._scan_q.qsize(),
+                )
+                self._scan_q.task_done()
