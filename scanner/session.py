@@ -19,6 +19,7 @@ from modes.defect import DefectMode
 from modes.transfer import TransferMode
 from modes.transfer_defect import TransferDefectMode
 from modes.package import PackageMode
+from modes.stretch import StretchMode
 from modes.base import Mode
 from core.config import Endpoints
 import httpx
@@ -99,6 +100,7 @@ class ScannerSession:
             "TRANSFER": TransferMode(),
             "TRANSFER_DEFECT": TransferDefectMode(),
             "PACKAGE": PackageMode(),
+            "STRETCH": StretchMode(),
         }
 
         self._reader = ComReader(
@@ -266,7 +268,15 @@ class ScannerSession:
     def set_mode(self, mode: ModeName, reason: str = "manual") -> None:
         self._state.mode = mode
         self._persist_state()
-        modes = {"COMPARE_FILL":"Резка (заполнение)", "COMPARE":"Сравнение", "DEFECT":"Брак резки", "TRANSFER":"Перенос", "TRANSFER_DEFECT":"Брак переноса", "PACKAGE":"Упаковка"}
+        modes = {
+            "COMPARE_FILL": "Резка (заполнение)",
+            "COMPARE": "Сравнение",
+            "DEFECT": "Брак резки",
+            "TRANSFER": "Перенос",
+            "TRANSFER_DEFECT": "Брак переноса",
+            "PACKAGE": "Упаковка",
+            "STRETCH": "Натяжка",
+        }
         self.tts.say(f"Режим {modes[mode]}")
         log.info("[%s] mode set to %s (%s)", self.device_id, mode, reason)
 
@@ -300,7 +310,7 @@ class ScannerSession:
         user_name = None
         mode = d.get("mode", "COMPARE_FILL")
 
-        if mode not in ("COMPARE_FILL", "COMPARE", "DEFECT", "TRANSFER","TRANSFER_DEFECT", "PACKAGE"):
+        if mode not in ("COMPARE_FILL", "COMPARE", "DEFECT", "TRANSFER", "TRANSFER_DEFECT", "PACKAGE", "STRETCH"):
             mode = "COMPARE_FILL"
 
         try:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ScanServer"
-version = "0.1.0"
+version = "1.1.6"
 description = "Local COM scanner client for CustomCraft MES"
 requires-python = ">=3.12,<3.13"
 dependencies = [

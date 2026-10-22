@@ -21,6 +21,7 @@ class Endpoints:
     transfer: str = "/api/v1/transfer/scan"
     defect: str = "/api/v1/defects/"
     package: str = "/api/v1/package/scan"
+    stretch: str = "/api/v1/stretch/scan"
 
 
 @dataclass(frozen=True)
@@ -72,6 +73,7 @@ def load_config(path: Path) -> AppConfig:
         transfer=str(endpoints_raw.get("transfer", Endpoints.transfer)),
         defect=str(endpoints_raw.get("defect", Endpoints.defect)),
         package=str(endpoints_raw.get("package", Endpoints.package)),
+        stretch=str(endpoints_raw.get("stretch", Endpoints.stretch)),
     )
 
     scanners_raw = raw.get("scanners", []) or []
