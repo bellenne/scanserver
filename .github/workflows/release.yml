@@ -40,6 +40,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pyinstaller pyserial httpx edge-tts pygame pyttsx3 aiohttp async-timeout yarl multidict
 
+      - name: Run tests
+        shell: pwsh
+        run: python -B -m unittest discover -s tests -v
+
       - name: Build release asset
         shell: pwsh
         run: ./scripts/build_release.ps1
