@@ -51,6 +51,7 @@ class ScannerManager:
                 state_store=self.state,
                 global_state=self.state_data,
                 endpoints=self.endpoints,
+                encoding=s.encoding,
             )
             self._sessions.append(sess)
             sess.start()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import codecs
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ class ScannerConfig:
     device_id: str
     com_port: str
     baudrate: int = 9600
+    encoding: str = "utf-8"
 
 
 @dataclass(frozen=True)
@@ -79,11 +81,14 @@ def load_config(path: Path) -> AppConfig:
     scanners_raw = raw.get("scanners", []) or []
     scanners: list[ScannerConfig] = []
     for s in scanners_raw:
+        encoding = str(s.get("encoding", "utf-8"))
+        codecs.lookup(encoding)
         scanners.append(
             ScannerConfig(
                 device_id=str(s["device_id"]),
                 com_port=str(s["com_port"]),
                 baudrate=int(s.get("baudrate", 9600)),
+                encoding=encoding,
             )
         )
 

@@ -22,20 +22,37 @@ class StretchMode(ModeBase):
             session.tts.say("Сначала выберите пользователя")
             return
 
-        # Второй этап выполняется только после успешного ответа на резку.
-        for stage, endpoint, error_message in (
-            ("cut", session.endpoints.events, "Ошибка отправки резки"),
-            ("stretch", session.endpoints.stretch, "Резка отправлена. Ошибка отправки натяжки"),
-        ):
-            try:
-                session.post_event(action="done", payload=payload, endpoint=endpoint)
-            except (httpx.TimeoutException, httpx.NetworkError) as e:
-                log.warning("[%s] STRETCH %s network error: %s", session.device_id, stage, e)
-                session.tts.say(f"{error_message}. Нет соединения с сервером")
+        # MES closes both stages atomically through this endpoint.
+        try:
+            result = session.post_event(action="done", payload=payload, endpoint=session.endpoints.stretch)
+        except (httpx.TimeoutException, httpx.NetworkError) as e:
+            log.warning("[%s] STRETCH network error: %s", session.device_id, e)
+            session.tts.say("Нет подтверждения натяжки. Проверьте соединение и повторите сканирование")
+            return
+        except Exception as e:
+            log.warning("[%s] STRETCH post failed: %s", session.device_id, e)
+            session.tts.say("Ошибка отправки натяжки. Проверьте журнал")
+            return
+
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            log.warning("[%s] STRETCH MES did not confirm success: %r", session.device_id, result)
+            session.tts.say("Сервер не подтвердил натяжку. Проверьте журнал")
+            return
+
+        stages = result.get("stages")
+        for stage in ("cut", "stretch"):
+            operation = stages.get(stage) if isinstance(stages, dict) else None
+            if not isinstance(operation, dict) or operation.get("status") != "done":
+                log.warning("[%s] STRETCH incomplete MES result: %r", session.device_id, result)
+                session.tts.say("Сервер не подтвердил завершение резки и натяжки. Проверьте MES")
                 return
-            except Exception as e:
-                log.warning("[%s] STRETCH %s post failed: %s", session.device_id, stage, e)
-                session.tts.say(error_message)
+            if not operation.get("report_id"):
+                log.warning("[%s] STRETCH missing %s report: %r", session.device_id, stage, result)
+                session.tts.say("Этап отмечен готовым, но отчёт отсутствует. Проверьте MES")
                 return
+
+        if result.get("duplicate") is True:
+            session.tts.say("Резка и натяжка уже выполнены")
+            return
 
         session.tts.say("Натяжка выполнена")

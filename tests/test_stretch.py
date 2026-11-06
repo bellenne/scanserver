@@ -19,13 +19,20 @@ from scanner.session import ScannerSession
 QR = "WALLPAPER|v=1|oi=1|art=DL-001|w=300|h=270|panels=3|kind=striped|code=test"
 
 
+def saved_response(*, duplicate: bool = False) -> dict:
+    return {"ok": True, "duplicate": duplicate, "stages": {
+        "cut": {"status": "done", "report_id": 11},
+        "stretch": {"status": "done", "report_id": 12},
+    }}
+
+
 class StretchTests(unittest.TestCase):
     def setUp(self) -> None:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.posts: list[httpx.Request] = []
-        self.post_outcomes: list[int | type[httpx.RequestError]] = []
+        self.post_outcomes: list[int | type[httpx.RequestError] | httpx.Response] = []
         self.tts = Mock()
         self.spoken_at_post: list[list[str]] = []
         client = httpx.Client(transport=httpx.MockTransport(self.respond))
@@ -45,7 +52,9 @@ class StretchTests(unittest.TestCase):
         outcome = self.post_outcomes.pop(0) if self.post_outcomes else 200
         if isinstance(outcome, type):
             raise outcome("Simulated connection failure", request=request)
-        return httpx.Response(outcome, json={"ok": outcome < 400})
+        if isinstance(outcome, httpx.Response):
+            return outcome
+        return httpx.Response(outcome, json=saved_response() if outcome < 400 else {"ok": False})
 
     def make_session(self, state: dict) -> ScannerSession:
         session = ScannerSession(
@@ -94,13 +103,13 @@ class StretchTests(unittest.TestCase):
     def assert_no_success(self) -> None:
         self.assertFalse(any("Натяжка выполнена" in text for text in self.spoken()))
 
-    def test_single_scan_posts_cut_then_stretch_with_standard_event_body(self) -> None:
+    def test_single_scan_posts_only_stretch_with_standard_event_body(self) -> None:
         self.select_stretch()
         self.scan(QR)
 
         self.assertEqual(
             [request.url.path for request in self.posts],
-            ["/api/v1/cut/scan", "/api/v1/stretch/scan"],
+            ["/api/v1/stretch/scan"],
         )
         for request in self.posts:
             body = json.loads(request.content)
@@ -116,7 +125,7 @@ class StretchTests(unittest.TestCase):
         for messages in self.spoken_at_post:
             self.assertFalse(any("Натяжка выполнена" in text for text in messages))
 
-    def test_cut_failure_stops_before_stretch(self) -> None:
+    def test_http_and_network_failures_do_not_announce_success_or_retry_cut(self) -> None:
         self.select_stretch()
         for failure in (422, 503, httpx.ConnectError, httpx.ReadTimeout):
             with self.subTest(failure=failure):
@@ -125,25 +134,55 @@ class StretchTests(unittest.TestCase):
                 self.post_outcomes = [failure]
                 self.scan(QR)
 
-                self.assertEqual([request.url.path for request in self.posts], ["/api/v1/cut/scan"])
+                self.assertEqual([request.url.path for request in self.posts], ["/api/v1/stretch/scan"])
                 self.assert_no_success()
                 self.assertTrue(self.spoken())
 
-    def test_stretch_failure_reports_partial_completion_without_retry(self) -> None:
+    def test_invalid_success_response_is_not_announced_as_completed(self) -> None:
         self.select_stretch()
-        for failure in (422, 503, httpx.ConnectError, httpx.ReadTimeout):
-            with self.subTest(failure=failure):
+        for response in (
+            httpx.Response(200, json={"ok": False, "message": "Rejected"}),
+            httpx.Response(200, json={"ok": True}),
+            httpx.Response(200, json=[]),
+            httpx.Response(200, text="<html>Login</html>"),
+            httpx.Response(204),
+            httpx.Response(200, json={"ok": True, "stages": {
+                "cut": {"status": "done", "report_id": 11},
+                "stretch": {"status": "pending", "report_id": None},
+            }}),
+            httpx.Response(200, json={"ok": True, "duplicate": True, "stages": {
+                "cut": {"status": "done", "report_id": 11},
+                "stretch": {"status": "done", "report_id": None},
+            }}),
+        ):
+            with self.subTest(response=response):
                 self.posts.clear()
                 self.tts.reset_mock()
-                self.post_outcomes = [200, failure]
+                self.post_outcomes = [response]
                 self.scan(QR)
 
                 self.assertEqual(
                     [request.url.path for request in self.posts],
-                    ["/api/v1/cut/scan", "/api/v1/stretch/scan"],
+                    ["/api/v1/stretch/scan"],
                 )
                 self.assert_no_success()
-                self.assertTrue(any("Резка отправлена" in text for text in self.spoken()))
+                self.assertTrue(self.spoken())
+
+    def test_duplicate_announces_already_completed(self) -> None:
+        self.select_stretch()
+        self.post_outcomes = [httpx.Response(200, json=saved_response(duplicate=True))]
+        self.scan(QR)
+        self.assert_no_success()
+        self.assertTrue(any("уже выполнены" in text for text in self.spoken()))
+
+    def test_qr_cyrillic_and_legacy_layout_are_sent_unchanged(self) -> None:
+        self.select_stretch()
+        for payload in (
+            "WALLPAPER|v=1|oi=21898|art=КРТ-003_3040|lk=КРТ-003_3040_OLD-P21898-I001-XVR_PAINTING",
+            "WALLPAPER|v=1|oi=21898|art=-003_3040|lk=-003_3040_OLD-P21898-I001-XVR_PAINTING",
+        ):
+            self.scan(payload)
+            self.assertEqual(json.loads(self.posts[-1].content)["payload"], payload)
 
     def test_working_scan_requires_selected_user(self) -> None:
         self.select_stretch(with_user=False)
@@ -183,7 +222,7 @@ class StretchTests(unittest.TestCase):
         self.scan(QR)
 
         self.assertEqual(
-            [request.url.path for request in self.posts], ["/custom/cut", "/custom/stretch"]
+            [request.url.path for request in self.posts], ["/custom/stretch"]
         )
 
     def test_worker_preserves_scan_order_with_user_and_mode_commands(self) -> None:
@@ -202,9 +241,7 @@ class StretchTests(unittest.TestCase):
         self.assertEqual(
             [(request.url.path, json.loads(request.content)["payload"]) for request in self.posts],
             [
-                ("/api/v1/cut/scan", QR),
                 ("/api/v1/stretch/scan", QR),
-                ("/api/v1/cut/scan", second_qr),
                 ("/api/v1/stretch/scan", second_qr),
             ],
         )

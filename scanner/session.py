@@ -73,6 +73,7 @@ class ScannerSession:
         state_store: StateStore,
         global_state: dict,
         endpoints: Endpoints,
+        encoding: str = "utf-8",
     ) -> None:
         self.device_id = device_id
         self.com_port = com_port
@@ -108,6 +109,8 @@ class ScannerSession:
             baudrate=self.baudrate,
             on_line=self.on_line,
             on_connected=self.on_connected,
+            encoding=encoding,
+            on_decode_error=lambda: self.tts.say("Ошибка кодировки QR. Проверьте настройки сканера"),
         )
 
         self._thread = threading.Thread(target=self._reader.run_forever, name=f"com-{device_id}", daemon=True)
@@ -286,7 +289,7 @@ class ScannerSession:
     def get_user_id(self) -> int | None:
         return self._state.user_id
 
-    def post_event(self, action: str, payload: str, extra: dict | None = None, endpoint: str | None = None) -> None:
+    def post_event(self, action: str, payload: str, extra: dict | None = None, endpoint: str | None = None) -> dict | None:
         if self._state.user_id is None:
             raise RuntimeError("User is not set for this scanner")
         body = {
@@ -300,7 +303,7 @@ class ScannerSession:
             body.update(extra)
 
         path = endpoint or self.endpoints.events
-        self.api.post_json(path, body)
+        return self.api.post_json(path, body)
 
     def _load_state(self) -> ScannerSessionState:
         devices = self.global_state.get("devices", {})

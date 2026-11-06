@@ -17,12 +17,16 @@ class ComReader:
         on_line: Callable[[str], None],
         on_connected: Callable[[], None] | None = None,
         reconnect_delay_s: float = 1.5,
+        encoding: str = "utf-8",
+        on_decode_error: Callable[[], None] | None = None,
     ) -> None:
         self.port = port
         self.baudrate = baudrate
         self.on_line = on_line
         self.on_connected = on_connected
         self.reconnect_delay_s = reconnect_delay_s
+        self.encoding = encoding
+        self.on_decode_error = on_decode_error
         self._stop = False
         self._ser: Optional[serial.Serial] = None
 
@@ -65,8 +69,12 @@ class ComReader:
             if not raw:
                 continue
             try:
-                line = raw.decode(errors="ignore").strip()
-            except Exception:
+                line = raw.decode(self.encoding).strip()
+            except UnicodeDecodeError:
+                log.error("QR decoding failed on %s with encoding %s; raw_hex=%s",
+                          self.port, self.encoding, raw[:200].hex())
+                if self.on_decode_error is not None:
+                    self.on_decode_error()
                 continue
             if line:
                 self.on_line(line)

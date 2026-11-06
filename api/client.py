@@ -38,10 +38,12 @@ class ApiClient:
                 body = e.response.text
             except Exception:
                 body = "<no body>"
-            log.warning("HTTP %s for %s. Response: %s", e.response.status_code, url, body)
+            log.warning("HTTP %s for %s. Request-ID: %s. Response: %s", e.response.status_code, url,
+                        e.response.headers.get("X-Request-Id", "-"), body[:4000])
             raise
 
-        
+        log.info("HTTP %s for %s. Request-ID: %s. Response: %s", r.status_code, url,
+                 r.headers.get("X-Request-Id", "-"), r.text[:4000])
         if not r.content:
             return None
         try:
