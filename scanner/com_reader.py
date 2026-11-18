@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Callable, Optional
 
 import serial  # type: ignore
 
 log = logging.getLogger("scanner.com")
+
+# Scanners terminate a code with CR, LF or CRLF depending on their suffix setting.
+_LINE_END = re.compile(rb"[\r\n]")
+# Serial read timeout: how often the loop wakes up when the port is silent.
+_READ_TIMEOUT_S = 0.1
+# A code without any terminator is emitted after this much silence.
+_IDLE_FLUSH_S = 0.3
 
 
 class ComReader:
@@ -58,23 +66,41 @@ class ComReader:
 
     def _connect(self) -> None:
         log.info("Connecting %s @ %s", self.port, self.baudrate)
-        self._ser = serial.Serial(self.port, self.baudrate, timeout=1)
+        self._ser = serial.Serial(self.port, self.baudrate, timeout=_READ_TIMEOUT_S)
         if self.on_connected is not None:
             self.on_connected()
 
     def _read_loop(self) -> None:
+        # readline() only splits on LF: with a CR-only scanner suffix every code
+        # was delayed by the read timeout and quick repeat scans merged into one
+        # payload ("QR\rQR"), which MES rejected. Split on CR/LF ourselves.
         assert self._ser is not None
+        buf = bytearray()
+        last_rx = time.monotonic()
         while not self._stop:
-            raw = self._ser.readline()  # до \n
-            if not raw:
-                continue
-            try:
-                line = raw.decode(self.encoding).strip()
-            except UnicodeDecodeError:
-                log.error("QR decoding failed on %s with encoding %s; raw_hex=%s",
-                          self.port, self.encoding, raw[:200].hex())
-                if self.on_decode_error is not None:
-                    self.on_decode_error()
-                continue
-            if line:
-                self.on_line(line)
+            chunk = self._ser.read(self._ser.in_waiting or 1)
+            now = time.monotonic()
+            if chunk:
+                buf += chunk
+                last_rx = now
+                *lines, rest = _LINE_END.split(bytes(buf))
+                buf = bytearray(rest)
+                for raw in lines:
+                    self._emit(raw)
+            elif buf and now - last_rx >= _IDLE_FLUSH_S:
+                self._emit(bytes(buf))
+                buf.clear()
+
+    def _emit(self, raw: bytes) -> None:
+        if not raw.strip():
+            return
+        try:
+            line = raw.decode(self.encoding).strip()
+        except UnicodeDecodeError:
+            log.error("QR decoding failed on %s with encoding %s; raw_hex=%s",
+                      self.port, self.encoding, raw[:200].hex())
+            if self.on_decode_error is not None:
+                self.on_decode_error()
+            return
+        if line:
+            self.on_line(line)

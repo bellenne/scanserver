@@ -138,6 +138,17 @@ class StretchTests(unittest.TestCase):
                 self.assert_no_success()
                 self.assertTrue(self.spoken())
 
+    def test_dropped_connection_asks_to_repeat_scan(self) -> None:
+        self.select_stretch()
+        for failure in (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
+            with self.subTest(failure=failure):
+                self.tts.reset_mock()
+                self.post_outcomes = [failure]
+                self.scan(QR)
+
+                self.assert_no_success()
+                self.assertTrue(any("повторите сканирование" in text for text in self.spoken()))
+
     def test_invalid_success_response_is_not_announced_as_completed(self) -> None:
         self.select_stretch()
         for response in (

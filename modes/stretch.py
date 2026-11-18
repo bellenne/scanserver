@@ -25,7 +25,9 @@ class StretchMode(ModeBase):
         # MES closes both stages atomically through this endpoint.
         try:
             result = session.post_event(action="done", payload=payload, endpoint=session.endpoints.stretch)
-        except (httpx.TimeoutException, httpx.NetworkError) as e:
+        except httpx.TransportError as e:
+            # Timeout / dropped connection / server closed without response:
+            # MES may have committed, the repeat scan is recognised as duplicate.
             log.warning("[%s] STRETCH network error: %s", session.device_id, e)
             session.tts.say("Нет подтверждения натяжки. Проверьте соединение и повторите сканирование")
             return
